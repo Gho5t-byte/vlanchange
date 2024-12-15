@@ -1,0 +1,78 @@
+import paramiko
+import argparse
+
+
+def ssh_to_device(host, username, password, commands):
+    """
+    Connects to a network device via SSH and executes the provided commands.
+    
+    Args:
+        host (str): IP address or hostname of the device.
+        username (str): Username to log into the device.
+        password (str): Password to log into the device.
+        commands (list): List of commands to execute on the device.
+    
+    Returns:
+        str: The output from the device.
+    """
+    try:
+        # Create SSH client
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        print(f"Connecting to {host}...")
+        client.connect(hostname=host, username=username, password=password)
+        
+        remote_connection = client.invoke_shell()
+        
+        output = ""
+        for command in commands:
+            remote_connection.send(command + '\n')
+            time.sleep(1)  # Wait for command to be processed
+            output += remote_connection.recv(65535).decode('utf-8')
+        
+        print("Command execution completed.")
+        
+    except paramiko.AuthenticationException as auth_error:
+        print(f"Authentication failed: {auth_error}")
+        output = ""
+    except paramiko.SSHException as ssh_error:
+        print(f"SSH connection failed: {ssh_error}")
+        output = ""
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        output = ""
+    finally:
+        client.close()
+    
+    return output
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Change VLAN on a network device via SSH.")
+    
+    parser.add_argument("--host", required=True, help="IP address or hostname of the device.")
+    parser.add_argument("--username", required=True, help="Username for the SSH connection.")
+    parser.add_argument("--password", required=True, help="Password for the SSH connection.")
+    parser.add_argument("--interface", required=True, help="Interface to configure, e.g., GigabitEthernet0/1.")
+    parser.add_argument("--vlan", required=True, help="VLAN ID to assign to the interface.")
+    
+    args = parser.parse_args()
+    
+    commands = [
+        "enable", 
+        "configure terminal", 
+        f"interface {args.interface}", 
+        f"switchport access vlan {args.vlan}", 
+        "end", 
+        "write memory"
+    ]
+    
+    output = ssh_to_device(host=args.host, username=args.username, password=args.password, commands=commands)
+    
+    print("\n--- Device Output ---\n")
+    print(output)
+
+
+if __name__ == "__main__":
+    main()
